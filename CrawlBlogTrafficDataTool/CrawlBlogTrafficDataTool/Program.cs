@@ -7,6 +7,9 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
+
+using System.Configuration;
 
 /// <summary>
 /// function：采集我的博客访问量，DownloadData()中为我的博客地址
@@ -16,10 +19,11 @@ public class Program
 {
     private const String BLOG_URL = "https://blog.csdn.net/Stephanie_1";
     private static DateTime last = DateTime.Now;
-    private const int COLLECT_INERVAL_MILISECOND = 1000 * 120;//yanruTODO 测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
+    private static int COLLECT_INERVAL_MILISECOND = 43200;//0;//1000 * 120;//yanruTODO 测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
 
-    static void Main(string[] args)
+    public static void Main(string[] args)
     {
+        Console.WriteLine("博客访问量统计开始统计，等待:"+COLLECT_INERVAL_MILISECOND+"毫秒之后"); 
         int tempCount = 0;
         Thread th = new Thread(ThreadChild);//ThreadChild);
         th.Start(20);
@@ -29,7 +33,7 @@ public class Program
         Console.ReadLine(); //让控制台暂停,否则一闪而过了  
     }
 
-    static void ThreadChild(object obj)
+    public static void ThreadChild(object obj)
     {
         while (true)
         {
@@ -169,6 +173,27 @@ public class Program
         {
             sw.Write(finalContent);
             //    sw.Write(pageHtml);
-        }
+        } 
     }
+
+    //public static  string GetConfigValue(string appKey)
+    //{
+    //    XmlDocument xDoc = new XmlDocument();
+    //    try
+    //    {
+    //        xDoc.Load(System.Windows.Forms.Application.ExecutablePath + ".config");
+    //        XmlNode xNode;
+    //        XmlElement xElem;
+    //        xNode = xDoc.SelectSingleNode("//appSettings");
+    //        xElem = (XmlElement)xNode.SelectSingleNode("//add[@key='" + appKey + "']");
+    //        if (xElem != null)
+    //            return xElem.GetAttribute("value");
+    //        else
+    //            return "";
+    //    }
+    //    catch (Exception)
+    //    {
+    //        return "";
+    //    }
+    //}
 }
