@@ -19,7 +19,7 @@ public class Program
 {
     private const String BLOG_URL = "https://blog.csdn.net/Stephanie_1";
     private static DateTime last = DateTime.Now;
-    private static int COLLECT_INERVAL_MILISECOND = 43200;//0;//1000 * 120;//yanruTODO 测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
+    private static int COLLECT_INERVAL_MILISECOND = 43200000;//0;//1000 * 120;//yanruTODO 测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
 
     public static void Main(string[] args)
     {
