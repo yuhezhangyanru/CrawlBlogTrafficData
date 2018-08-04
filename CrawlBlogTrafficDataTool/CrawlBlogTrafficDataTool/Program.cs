@@ -151,7 +151,7 @@ public class Program
         </dl>
          * str
          * **/
-        string matchCount = "<dt>" + matchChinese + "：</dt>\n";// +anyStr + "<dd title=";
+        string matchCount = "<dt>" + matchChinese + "：</dt>\n\t\t";// +anyStr + "<dd title=";
         m = Regex.Match(pageHtml, matchCount, RegexOptions.Multiline);
         Console.WriteLine("匹配字符串matchCount=" + matchCount);
         while (m.Success)
