@@ -58,45 +58,13 @@ public class Program
         string pageHtml = Encoding.UTF8.GetString(pageData);  //如果获取网站页面采用的是GB2312，则使用这句
         String finalContent = "记录时间," + DateTime.Now;
         List<KeyValueInfo> keyList = new List<KeyValueInfo>();
-
-        //访问：
-        int index = 0;
-        Boolean hasData = false;
-        String visitCountKey = "";
-        String readStr = "";
-        int visitIndex = 0;
-        visitCountKey = "<dt>访问：</dt>";
-        visitIndex = pageHtml.IndexOf(visitCountKey) + visitCountKey.Length;
-        if (pageHtml.IndexOf(visitCountKey) >= 0)
-        {
-            for (index = visitIndex; index < pageHtml.Length; index++)
-            {
-                var ch = pageHtml[index];
-                readStr += ch;
-                if (ch == '>')
-                {
-                    readStr = readStr.Replace("\n", "");
-                    readStr = readStr.Replace(" ", "");
-                    readStr = readStr.Substring(readStr.IndexOf("\"") + 1, readStr.LastIndexOf("\"") - readStr.IndexOf("\"") - 1);
-                    //       Console.WriteLine("当前值readStr=" + readStr);
-                    finalContent += ",总访问量," + readStr;
-                    hasData = true;
-                    break;
-                }
-            }
-        }
-        if (!hasData)
-        {
-            finalContent += ",总访问量,-1";
-        }
-          
+         
         string anyStr = "(.*?)";
         string sign="\"";
         string regexNumber = @"^(-?\d+)(\.\d+)?$";//匹配一个数字
 
 
         Match m;
-
         //统计：专栏数据格式
         /**
          <p class="title"><a href="https://blog.csdn.net/column/details/25100.html" target="_blank">ASP.NET网站开发</a></p>
@@ -115,7 +83,7 @@ public class Program
             {
                 string value = item.ToString().Replace("<dt>", "");
                 value = value.Replace("</dt>", "");
-                 Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString()+",laterValue="+value);
+                // Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString()+",laterValue="+value);
                 string addStr = "";
                 for (int readIndex = match.Index + match.ToString().Length+1; readIndex < pageHtml.Length; readIndex++)
                 {
@@ -141,7 +109,7 @@ public class Program
         }
 
         string matchChinese = @"[\u4e00-\u9fa5]*[\u4e00-\u9fa5]";//匹配一个中文字符串：即收尾要求都是中文暂时 "[\u4e00-\u9fa5]";
-        string matchNumber = @"[\d\.]+ [\d\.]*";
+        string matchNumber = @"[\d\.]+ [\d\.]*"; 
         //统计：访问量等关键字 
         /**
          <dl>
@@ -151,7 +119,7 @@ public class Program
         </dl>
          * str
          * **/
-        string matchCount = "<dt>" + matchChinese + "：</dt>\n\t\t";// +anyStr + "<dd title=";
+        string matchCount = "<dt>" + matchChinese + "：</dt>";//\n            ";//<dd title=" + anyStr + ">";// +sign;// +matchNumber;// +anyStr + "<dd title=";
         m = Regex.Match(pageHtml, matchCount, RegexOptions.Multiline);
         Console.WriteLine("匹配字符串matchCount=" + matchCount);
         while (m.Success)
@@ -159,18 +127,30 @@ public class Program
             var match = m;
             int tempIndex = 0;
 
-            Console.WriteLine("匹配到的=" + match.ToString());//+"@index="+match.Index);
+        //    Console.WriteLine("匹配到的=" + match.ToString()+"@index="+match.Index);
             foreach (var item in m.Groups)
             {
                 string value = item.ToString().Replace("<dt>", "");
                 value = value.Replace("</dt>", "");
-                Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
+            //    Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
                 string addStr = "";
-                for (int readIndex = match.Index ; readIndex < pageHtml.Length; readIndex++)
+                for (int readIndex = match.Index +match.ToString().Length+1; readIndex < pageHtml.Length; readIndex++)
                 {
+                    addStr += pageHtml[readIndex];
                     if (addStr.EndsWith(">"))
                     {
-                        Console.WriteLine("该参数累加的addStr="+addStr);//[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
+                       // Console.WriteLine("该参数累加的addStr=" + addStr);//[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
+                        var tempValues = addStr.Split('"');
+                        foreach (string tempStr in tempValues)
+                        {
+                            int tempNumberAsCount = -1;
+                            int.TryParse(tempStr, out tempNumberAsCount);
+                        //    Console.WriteLine("临时值=" + tempStr + ",tempNumberAsCount=" + tempNumberAsCount + ",是数字?" + (tempNumberAsCount>0) + "@");
+                            if (tempNumberAsCount > 0)
+                            {
+                                keyList.Add(new KeyValueInfo(value,tempStr));
+                            }
+                        }
                         break;
                     }
                 }
@@ -262,18 +242,33 @@ public class Program
                 continue;
             }
             tempStrList.Add(keyList[tempIndex].key);
-        } 
+        }
+
+        var keyContent = "";
+        
+        finalContent +=",";
+        tempStrList.Clear();
         foreach(KeyValueInfo item in keyList)
-        { 
-           File.AppendAllText(@"D:\yanruDelete.txt","识别得到的key="+item.key+",value="+item.value+"\n");
+        {
+            if (tempStrList.Contains(item.key))
+                continue; 
+         //  finalContent += item.key + "," + item.value + ",";
+            finalContent += item.value + ",";
+            keyContent += item.key + ",";
+           tempStrList.Add(item.key);
         }
 
         finalContent += "\n";
         String pathRoot = Environment.CurrentDirectory;
         Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot);
-        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog_2.txt", true, Encoding.Default))
+        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog统计关键字的值.txt", true, Encoding.Default))
         {
             sw.Write(finalContent);
+            //    sw.Write(pageHtml);
+        }
+        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog统计关键字.txt",false, Encoding.Default))
+        {
+            sw.Write(keyContent);
             //    sw.Write(pageHtml);
         }
         //using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLastHTML.txt", true, Encoding.Default))
