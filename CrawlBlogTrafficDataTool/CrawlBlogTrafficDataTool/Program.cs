@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Xml;
 
 using System.Configuration;
+using System.Text.RegularExpressions;
 
 /// <summary>
 /// function：采集我的博客访问量，DownloadData()中为我的博客地址
@@ -30,6 +31,8 @@ public class Program
         th.IsBackground = true;
         //   th.s.Start(); 
         //    Console.WriteLine("另一个目录=" + AppDomain.CurrentDomain.BaseDirectory);
+
+        UpdateGetData();//刚刚启动先采集一次
         Console.ReadLine(); //让控制台暂停,否则一闪而过了  
     }
 
@@ -54,6 +57,8 @@ public class Program
 
         string pageHtml = Encoding.UTF8.GetString(pageData);  //如果获取网站页面采用的是GB2312，则使用这句
         String finalContent = "记录时间," + DateTime.Now;
+        List<KeyValueInfo> keyList = new List<KeyValueInfo>();
+
         //访问：
         int index = 0;
         Boolean hasData = false;
@@ -84,96 +89,198 @@ public class Program
         {
             finalContent += ",总访问量,-1";
         }
+          
+        string anyStr = "(.*?)";
+        string sign="\"";
+        string regexNumber = @"^(-?\d+)(\.\d+)?$";//匹配一个数字
 
-        //我的排名
-        visitCountKey = "<dt>排名：</dt>";
-        hasData = false;
-        readStr = "";
-        visitIndex = pageHtml.IndexOf(visitCountKey) - 1;// +visitCountKey.Length;
-        if (pageHtml.IndexOf(visitCountKey) >= 0)
-        {
-            for (index = visitIndex; index > 0; index--)
-            {
-                var ch = pageHtml[index];
-                readStr = readStr.Insert(0, ch + "");//+=ch;
-                if (ch == '<')
-                {
-                    readStr = readStr.Replace("\n", "");
-                    readStr = readStr.Replace(" ", "");
-                    //   readStr.Reverse();
-                    readStr = readStr.Substring(readStr.IndexOf("\"") + 1, readStr.LastIndexOf("\"") - readStr.IndexOf("\"") - 1);
-                    //     Console.WriteLine("当前值readStr=" + readStr);
-                    finalContent += ",排名," + readStr;
-                    hasData = true;
-                    break;
-                }
-            }
-        }
-        if (!hasData)
-        {
-            finalContent += ",排名,-1";
-        }
 
-        //Unity学习总结</a></p> 专栏访问量和文章数
-        visitCountKey = "Unity学习总结</a></p>";
-        hasData = false;
-        readStr = "";
-        visitIndex = pageHtml.IndexOf(visitCountKey) + +visitCountKey.Length;
-        try
+        Match m;
+
+        //统计：专栏数据格式
+        /**
+         <p class="title"><a href="https://blog.csdn.net/column/details/25100.html" target="_blank">ASP.NET网站开发</a></p>
+                        <div class="data">阅读量：<span>5599</span><span class="count">5 篇</span></div>
+         * **/ 
+        string patternURI = @"<p class="+sign+"title"+sign+"><a href=" + sign + "https://blog.csdn.net" + anyStr + ".html" + sign;// +" target=";// +sign + "_blank" + sign + ">";// +anyStr + "</a></p>";
+        m = Regex.Match(pageHtml, patternURI, RegexOptions.Multiline);
+        Console.WriteLine("匹配字符串patternURI=" + patternURI);
+        while (m.Success)
         {
-            if (pageHtml.IndexOf(visitCountKey) >= 0)
+            var match = m;
+            int tempIndex = 0;
+
+            //Console.WriteLine("匹配到的=" + match.ToString());//+"@index="+match.Index);
+            foreach (var item in m.Groups)
             {
-                for (index = visitIndex; index < pageHtml.Length; index++)
+                string value = item.ToString().Replace("<dt>", "");
+                value = value.Replace("</dt>", "");
+                 Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString()+",laterValue="+value);
+                string addStr = "";
+                for (int readIndex = match.Index + match.ToString().Length+1; readIndex < pageHtml.Length; readIndex++)
                 {
-                    var ch = pageHtml[index];
-                    readStr += ch;
-                    if (readStr.EndsWith("</span></div>"))
+                    addStr += pageHtml[readIndex];
+                    if (addStr.EndsWith("</div>"))
                     {
-                        readStr = readStr.Replace("\n", "");
-                        readStr = readStr.Replace(" ", "");
-                        //     readStr = readStr.Substring(readStr.IndexOf("\"") + 1, readStr.LastIndexOf("\"") - readStr.IndexOf("\"") - 1);
-                        //    Console.WriteLine("当前值readStr=" + readStr);
-                        String[] array = readStr.Split("<".ToCharArray());
-                        //  for (int tempIndex = 0; tempIndex < array.Length; tempIndex++)
-                        //  {
-                        //array[0]=
-                        //array[1]=divclass="data">阅读量：
-                        //array[2]=span>46465
-                        //array[3]=/span>
-                        //array[4]=spanclass="count">18篇
-                        //array[5]=/span>
-                        //array[6]=/div>
-                        //   Console.WriteLine("array[" + tempIndex + "]=" + array[tempIndex]);
-                        // }
-                        finalContent += ",Unity学习专栏访问量," + array[2].Substring(array[2].IndexOf(">") + 1);
-                        String fileCount = array[4].Substring(array[4].IndexOf(">") + 1);
-                        fileCount = fileCount.Replace("篇", "");
-                        finalContent += ",Unity学习专栏文章," + fileCount;
-                        hasData = true;
+                        var categoryName = addStr.Substring(0, addStr.IndexOf("<")); //专栏标题
+                        var tempContent = addStr.Substring(addStr.IndexOf("<span>")+"<span>".Length);
+                        var readCount = tempContent.Substring(0, tempContent.IndexOf("</span>")); //专栏阅读量
+                        var fileCountKey = "<span class="+sign+"count"+sign+">"; 
+                        var fileCount = tempContent.Substring(tempContent.IndexOf(fileCountKey) + fileCountKey.Length); 
+                        fileCount = fileCount.Substring(0, fileCount.IndexOf(" "));//</span></div>"));//专栏文章数
+                        
+                        //File.AppendAllText(@"D:\yanruDelete.txt", DateTime.Now + ":读到的关键字符串=" + addStr
+                        //    + "\n专栏标题title=" + categoryName + "\ntempContent=" + tempContent + "\n阅读数=" + readCount + "\nfileCount="+fileCount+"\n");
+                        keyList.Add(new KeyValueInfo(categoryName + "阅读量", readCount));
+                        keyList.Add(new KeyValueInfo(categoryName + "文章数", fileCount));
                         break;
                     }
                 }
             }
+            m = m.NextMatch();
         }
-        catch (Exception e)
+
+        string matchChinese = @"[\u4e00-\u9fa5]*[\u4e00-\u9fa5]";//匹配一个中文字符串：即收尾要求都是中文暂时 "[\u4e00-\u9fa5]";
+        string matchNumber = @"[\d\.]+ [\d\.]*";
+        //统计：访问量等关键字 
+        /**
+         <dl>
+            <dt>访问：</dt>
+            <dd title="88988">
+                8万+            </dd>
+        </dl>
+         * str
+         * **/
+        string matchCount = "<dt>" + matchChinese + "：</dt>\n";// +anyStr + "<dd title=";
+        m = Regex.Match(pageHtml, matchCount, RegexOptions.Multiline);
+        Console.WriteLine("匹配字符串matchCount=" + matchCount);
+        while (m.Success)
         {
+            var match = m;
+            int tempIndex = 0;
+
+            Console.WriteLine("匹配到的=" + match.ToString());//+"@index="+match.Index);
+            foreach (var item in m.Groups)
+            {
+                string value = item.ToString().Replace("<dt>", "");
+                value = value.Replace("</dt>", "");
+                Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
+                string addStr = "";
+                for (int readIndex = match.Index ; readIndex < pageHtml.Length; readIndex++)
+                {
+                    if (addStr.EndsWith(">"))
+                    {
+                        Console.WriteLine("该参数累加的addStr="+addStr);//[" + tempIndex + "],value=" + item.ToString() + ",laterValue=" + value);
+                        break;
+                    }
+                }
+            }
+            m = m.NextMatch();
         }
-        if (!hasData)
+
+        //统计：积分、排名等关键字。匹配格式
+        /**  <dt>积分：</dt>
+            <dd title=1627>
+                1627            </dd>
+         * **/
+      //  string matchContent = pageHtml;
+        string matchStr1 = "<dt>" + matchChinese + "</dt>";//匹配到所有的中文关键字，看下一个词段内是否包含数字 +anyStr + "<dd title=" + sign + matchNumber + sign + ">";// "<dt>" + matchChinese + "：</dt>";
+        // +anyStr + "</dd>";//"^\d*$";//"^[1-9]\d*$";// regexNumber;// "<dd title=" + sign + regexNumber + anyStr + "</dd>";
+        m = Regex.Match(pageHtml, matchStr1, RegexOptions.Multiline);
+        Console.WriteLine("匹配字符串matchStr1=" + matchStr1);
+        while (m.Success)
         {
-            finalContent += ",Unity学习专栏访问量,-1";
-            finalContent += ",Unity学习专栏文章,-1";
+            var match = m;
+            int tempIndex = 0;
+              
+            //Console.WriteLine("匹配到的=" + match.ToString());//+"@index="+match.Index);
+            foreach (var item in m.Groups)
+            {
+                string value = item.ToString().Replace("<dt>", "");
+                value = value.Replace("</dt>", "");
+                //Console.WriteLine("参数[" + tempIndex + "],value=" + item.ToString()+",laterValue="+value);
+                string addStr = "";
+                for (int readIndex = match.Index+ match.ToString().Length; readIndex < pageHtml.Length; readIndex++)
+                {
+                    addStr += pageHtml[readIndex];
+                    if (addStr.EndsWith("/dd>"))
+                    {
+                        //提取数字，提取成功的，添加一次key value,此外， 
+                        //yanruTODO 最后对键值对列表 key过滤多余符号，并且去重复
+                        addStr = addStr.Replace("\n", ""); 
+                        Match tempMatch = Regex.Match(addStr, @"[\d]*[\d]", RegexOptions.Multiline);//匹配两位及以上数字 
+                        if (tempMatch.Groups.Count > 0)
+                        {
+                            string tempValue = tempMatch.Groups[0].ToString(); 
+                            if (tempValue != "")
+                            {
+                                keyList.Add(new KeyValueInfo(value, tempValue));
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                tempIndex++;
+            }
+            m = m.NextMatch();
         }
 
 
+        string content = pageHtml;
+        string regexStr = "<dt>" + anyStr + "</dt>" + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>";
+        
+        //step0:匹配格式：
+        //<dt>评论</dt>
+        //    <dd><span class="count">72</span></dd>
+        m = Regex.Match(content, regexStr, RegexOptions.Multiline);
+        Console.WriteLine("匹配的字符串="+regexStr);
+        while (m.Success)
+        {
+            var match = m;
+            int tempIndex = 0;
+        //    Console.WriteLine("匹配到的=" + match.ToString());
+            string key = "";
+            foreach(var item in m.Groups)
+            { 
+                if (tempIndex == 1)//中文关键字
+                    key = item.ToString();
+                if (tempIndex == 3 && key!="")
+                    keyList.Add(new KeyValueInfo(key,item.ToString()));
+                tempIndex++;
+            }            
+            m = m.NextMatch();
+        }
+        List<string> tempStrList = new List<string>();
+        for (int tempIndex = 0; tempIndex < keyList.Count; tempIndex++)
+        {
+            keyList[tempIndex].key = keyList[tempIndex].key.Replace("：", "");
+            if (tempStrList.Contains(keyList[tempIndex].key))
+            {
+            //    keyList[tempIndex].key += tempIndex + "";
+                keyList.RemoveAt(tempIndex);
+                continue;
+            }
+            tempStrList.Add(keyList[tempIndex].key);
+        } 
+        foreach(KeyValueInfo item in keyList)
+        { 
+           File.AppendAllText(@"D:\yanruDelete.txt","识别得到的key="+item.key+",value="+item.value+"\n");
+        }
 
         finalContent += "\n";
         String pathRoot = Environment.CurrentDirectory;
         Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot);
-        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog_1.txt", true, Encoding.Default))
+        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog_2.txt", true, Encoding.Default))
         {
             sw.Write(finalContent);
             //    sw.Write(pageHtml);
-        } 
+        }
+        //using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLastHTML.txt", true, Encoding.Default))
+        //{
+        //    sw.Write(pageHtml);
+        //    //    sw.Write(pageHtml);
+        //}
     }
 
     //public static  string GetConfigValue(string appKey)
