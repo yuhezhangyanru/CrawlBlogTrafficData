@@ -11,6 +11,7 @@ using System.Xml;
 
 using System.Configuration;
 using System.Text.RegularExpressions;
+using System.Security.AccessControl;
 
 /// <summary>
 /// function：采集我的博客访问量，DownloadData()中为我的博客地址
@@ -18,20 +19,37 @@ using System.Text.RegularExpressions;
 /// </summary>
 public class Program
 {
-    private const String BLOG_URL = "https://blog.csdn.net/Stephanie_1";
+    /// <summary>
+    /// 统计的博客地址
+    /// </summary>
+    private static String BLOG_URL = "https://blog.csdn.net/Stephanie_1";
     private static DateTime last = DateTime.Now;
-    private static int COLLECT_INERVAL_MILISECOND = 43200000;//0;//1000 * 120;//yanruTODO 测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
+    private static int COLLECT_INERVAL_MILISECOND = 43200;//0;//1000 * 120;//测试每隔2min采集一次 43200;//每隔0.5天采集一次，60;//每隔5s采集一次数据
+    private static string userNameKey = "";//作为统计文档的关键字
 
     public static void Main(string[] args)
     {
-        Console.WriteLine("博客访问量统计开始统计，等待:"+COLLECT_INERVAL_MILISECOND+"毫秒之后"); 
+        Console.WriteLine("请输入你的CSDN博客地址(如:https://blog.csdn.net/Stephanie_1)：");
+        var readLine = Console.ReadLine();
+        Console.WriteLine("输入的博客地址:" + readLine + "@");
+        if (!readLine.StartsWith("https://blog.csdn.net/") && readLine != "")
+        {
+            Console.WriteLine("输入的站点非CSDN博客地址！请重启程序重新输入！");
+            Console.ReadKey();
+            return;
+        }
+        if (readLine != "")
+        {
+            BLOG_URL = readLine;
+        }
+        userNameKey = BLOG_URL.Substring(BLOG_URL.LastIndexOf("/") + 1);
+        Console.WriteLine("用户统计关键字:" + userNameKey + ",博客访问量统计开始统计，等待:" + COLLECT_INERVAL_MILISECOND + "毫秒之后");
         int tempCount = 0;
         Thread th = new Thread(ThreadChild);//ThreadChild);
         th.Start(20);
         th.IsBackground = true;
         //   th.s.Start(); 
-        //    Console.WriteLine("另一个目录=" + AppDomain.CurrentDomain.BaseDirectory);
-
+        //    Console.WriteLine("另一个目录=" + AppDomain.CurrentDomain.BaseDirectory); 
         UpdateGetData();//刚刚启动先采集一次
         Console.ReadLine(); //让控制台暂停,否则一闪而过了  
     }
@@ -56,14 +74,13 @@ public class Program
         Byte[] pageData = MyWebClient.DownloadData(BLOG_URL);
 
         string pageHtml = Encoding.UTF8.GetString(pageData);  //如果获取网站页面采用的是GB2312，则使用这句
-        String finalContent = "记录时间," + DateTime.Now;
+        String finalContent = "";
         List<KeyValueInfo> keyList = new List<KeyValueInfo>();
          
         string anyStr = "(.*?)";
         string sign="\"";
         string regexNumber = @"^(-?\d+)(\.\d+)?$";//匹配一个数字
-
-
+         
         Match m;
         //统计：专栏数据格式
         /**
@@ -76,8 +93,7 @@ public class Program
         while (m.Success)
         {
             var match = m;
-            int tempIndex = 0;
-
+            int tempIndex = 0; 
             //Console.WriteLine("匹配到的=" + match.ToString());//+"@index="+match.Index);
             foreach (var item in m.Groups)
             {
@@ -95,8 +111,7 @@ public class Program
                         var readCount = tempContent.Substring(0, tempContent.IndexOf("</span>")); //专栏阅读量
                         var fileCountKey = "<span class="+sign+"count"+sign+">"; 
                         var fileCount = tempContent.Substring(tempContent.IndexOf(fileCountKey) + fileCountKey.Length); 
-                        fileCount = fileCount.Substring(0, fileCount.IndexOf(" "));//</span></div>"));//专栏文章数
-                        
+                        fileCount = fileCount.Substring(0, fileCount.IndexOf(" "));//</span></div>"));//专栏文章数 
                         //File.AppendAllText(@"D:\yanruDelete.txt", DateTime.Now + ":读到的关键字符串=" + addStr
                         //    + "\n专栏标题title=" + categoryName + "\ntempContent=" + tempContent + "\n阅读数=" + readCount + "\nfileCount="+fileCount+"\n");
                         keyList.Add(new KeyValueInfo(categoryName + "阅读量", readCount));
@@ -244,38 +259,75 @@ public class Program
             tempStrList.Add(keyList[tempIndex].key);
         }
 
-        var keyContent = "";
-        
-        finalContent +=",";
+        var keyContent = ""; 
+        keyList.Insert(0, new KeyValueInfo("记录时间",
+            DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
         tempStrList.Clear();
-        foreach(KeyValueInfo item in keyList)
+        List<string> newValueList = new List<string>();
+        foreach (KeyValueInfo item in keyList)
         {
             if (tempStrList.Contains(item.key))
-                continue; 
-         //  finalContent += item.key + "," + item.value + ",";
+                continue;
             finalContent += item.value + ",";
             keyContent += item.key + ",";
-           tempStrList.Add(item.key);
+            tempStrList.Add(item.key);
+            newValueList.Add(item.value);
+        }
+        
+        //保存解析后的值
+        finalContent += "\n";
+        string accountFileKey = userNameKey +"的";
+        String pathRoot = Environment.CurrentDirectory;
+        Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot);// + ",keyList=" + keyList.Count);
+        string valuePath = pathRoot + @"\" + accountFileKey + "统计关键字的值.txt";
+        string keyPath = pathRoot + @"\" + accountFileKey + "统计关键字.txt";
+        var oldLines = new string[1];
+        bool allValueSame = true;
+        if (File.Exists(valuePath))
+        {
+            oldLines = File.ReadAllLines(valuePath, Encoding.Default);
+            for (int index = oldLines.Length - 1; index > 0; index--)
+            {
+                var valueCurLine = oldLines[index].Split(',');
+                if (valueCurLine.Length < newValueList.Count)
+                    continue;
+
+                for (int tempIndex = 0; tempIndex < valueCurLine.Length; tempIndex++)
+                {
+                    var oldValue = valueCurLine[tempIndex];
+                    if (oldValue != "")
+                    {
+                        var newValue = newValueList[tempIndex];
+                        //Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + "@");
+                        if (oldValue != newValue)
+                        {
+                            allValueSame = false;
+                            break;
+                        }
+                    }
+                }
+                //  Console.WriteLine("读取当前行=" + valueCurLine.Length + "，新的值value.count=" + tempStrList.Count + ",行信息=" + oldLines[index]);
+            }
+        }
+        else
+        {
+           // var dirPath = valuePath.Substring(0, valuePath.LastIndexOf(@"\")+1);
+           // Directory.CreateDirectory(dirPath, new DirectorySecurity(dirPath, AccessControlSections.Owner));//保证新目录不是只读的
+            //File.Create(valuePath);
+            allValueSame = false; 
         }
 
-        finalContent += "\n";
-        String pathRoot = Environment.CurrentDirectory;
-        Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot);
-        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog统计关键字的值.txt", true, Encoding.Default))
+        //有值发生变化，才进行统计
+        if (!allValueSame)
         {
-            sw.Write(finalContent);
-            //    sw.Write(pageHtml);
+         //   if (!File.Exists(valuePath))
+              //  File.CreateText(valuePath);
+            File.AppendAllText(valuePath, finalContent, Encoding.Default);
         }
-        using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLog统计关键字.txt",false, Encoding.Default))
+        using (StreamWriter sw = new StreamWriter(keyPath, false, Encoding.Default))
         {
-            sw.Write(keyContent);
-            //    sw.Write(pageHtml);
-        }
-        //using (StreamWriter sw = new StreamWriter(pathRoot + @"\yanruCSDNVisitLastHTML.txt", true, Encoding.Default))
-        //{
-        //    sw.Write(pageHtml);
-        //    //    sw.Write(pageHtml);
-        //}
+            sw.Write(keyContent); 
+        } 
     }
 
     //public static  string GetConfigValue(string appKey)
