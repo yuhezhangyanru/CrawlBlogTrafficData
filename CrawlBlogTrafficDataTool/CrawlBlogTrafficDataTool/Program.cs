@@ -58,11 +58,8 @@ public class Program
     {
         while (true)
         {
-            Thread.Sleep(COLLECT_INERVAL_MILISECOND);
-            // Console.WriteLine("Child Thread Start!");
-            //   DateTime now = DateTime.Now;
-            UpdateGetData();
-            //    Console.WriteLine("刷新 now=" + now + ",sub=" + (now - last).TotalMilliseconds);
+            Thread.Sleep(COLLECT_INERVAL_MILISECOND); 
+            UpdateGetData(); 
         }
     }
 
@@ -278,50 +275,62 @@ public class Program
         finalContent += "\n";
         string accountFileKey = userNameKey +"的";
         String pathRoot = Environment.CurrentDirectory;
-        Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot);// + ",keyList=" + keyList.Count);
         string valuePath = pathRoot + @"\" + accountFileKey + "统计关键字的值.txt";
         string keyPath = pathRoot + @"\" + accountFileKey + "统计关键字.txt";
         var oldLines = new string[1];
         bool allValueSame = true;
+        Console.WriteLine(DateTime.Now + "爬取完毕，当前程序pathRoot=\n" + pathRoot + ",保存统计结果的路径=" + valuePath
+            + ",路径存在?" + ((File.Exists(valuePath))));// + ",keyList=" + keyList.Count);
         if (File.Exists(valuePath))
         {
             oldLines = File.ReadAllLines(valuePath, Encoding.Default);
-            for (int index = oldLines.Length - 1; index > 0; index--)
-            {
-                var valueCurLine = oldLines[index].Split(',');
-                if (valueCurLine.Length < newValueList.Count)
-                    continue;
+          //  Console.WriteLine("读取旧的文件文件="+valuePath+",文件的行数="+oldLines.Length);
 
-                for (int tempIndex = 0; tempIndex < valueCurLine.Length; tempIndex++)
+            var oldLastLine = "";
+            if (oldLines.Length >= 1)
+            {
+                oldLastLine = oldLines[oldLines.Length - 1];
+            }
+            if (oldLastLine == "" || oldLastLine == "\n")
+            {
+                allValueSame = false;
+            }
+            else
+            {
+                var oldValueLine = oldLastLine.Split(',');
+              //  Console.WriteLine("读到的行内容=" + oldLines[index] + ",个数=" + oldValueLine.Length);
+                if (oldValueLine.Length < newValueList.Count)
                 {
-                    var oldValue = valueCurLine[tempIndex];
-                    if (oldValue != "")
+                //    Console.WriteLine("读取的新的值个数newValueList.Count=" + newValueList.Count + ",oldValueLine.Length=" + oldValueLine.Length);
+                    allValueSame = false;
+                }
+                else
+                {
+                    for (int tempIndex = 0; tempIndex < oldValueLine.Length; tempIndex++)
                     {
-                        var newValue = newValueList[tempIndex];
-                        //Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + "@");
-                        if (oldValue != newValue)
+                        var oldValue = oldValueLine[tempIndex];
+                        if (oldValue != "")
                         {
-                            allValueSame = false;
-                            break;
+                            var newValue = newValueList[tempIndex];
+                         //   Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + ",值不同?" + (oldValue != newValue) + "@");
+                            if (oldValue != newValue)
+                            {
+                                allValueSame = false;
+                                break;
+                            }
                         }
                     }
-                }
-                //  Console.WriteLine("读取当前行=" + valueCurLine.Length + "，新的值value.count=" + tempStrList.Count + ",行信息=" + oldLines[index]);
-            }
+                } 
+            } 
         }
         else
-        {
-           // var dirPath = valuePath.Substring(0, valuePath.LastIndexOf(@"\")+1);
-           // Directory.CreateDirectory(dirPath, new DirectorySecurity(dirPath, AccessControlSections.Owner));//保证新目录不是只读的
-            //File.Create(valuePath);
+        { 
             allValueSame = false; 
         }
-
+        Console.WriteLine("统计完毕，有变化插入新记录？" + (!allValueSame));
         //有值发生变化，才进行统计
         if (!allValueSame)
         {
-         //   if (!File.Exists(valuePath))
-              //  File.CreateText(valuePath);
             File.AppendAllText(valuePath, finalContent, Encoding.Default);
         }
         using (StreamWriter sw = new StreamWriter(keyPath, false, Encoding.Default))
