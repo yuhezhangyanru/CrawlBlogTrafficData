@@ -312,9 +312,9 @@ public class Program
                         if (oldValue != "")
                         {
                             var newValue = newValueList[tempIndex];
-                         //   Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + ",值不同?" + (oldValue != newValue) + "@");
-                            if (oldValue != newValue)
+                            if (oldValue != newValue && tempIndex > 0)//忽略0的
                             {
+                             //   Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + ",值不同?" + (oldValue != newValue) + "@");
                                 allValueSame = false;
                                 break;
                             }
