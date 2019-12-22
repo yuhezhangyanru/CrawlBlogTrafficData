@@ -309,7 +309,7 @@ public class Program
                     for (int tempIndex = 0; tempIndex < oldValueLine.Length; tempIndex++)
                     {
                         var oldValue = oldValueLine[tempIndex];
-                        if (oldValue != "")
+                        if (oldValue != "" && tempIndex < newValueList.Count)
                         {
                             var newValue = newValueList[tempIndex];
                             if (oldValue != newValue && tempIndex > 0)//忽略0的
