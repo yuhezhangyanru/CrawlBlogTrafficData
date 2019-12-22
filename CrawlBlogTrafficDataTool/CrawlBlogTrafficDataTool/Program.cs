@@ -12,6 +12,7 @@ using System.Xml;
 using System.Configuration;
 using System.Text.RegularExpressions;
 using System.Security.AccessControl;
+using CrawlBlogTrafficDataTool;
 
 /// <summary>
 /// function：采集我的博客访问量，DownloadData()中为我的博客地址
@@ -30,14 +31,16 @@ public class Program
     public static void Main(string[] args)
     {
         Console.WriteLine("请输入你的CSDN博客地址(如:https://blog.csdn.net/Stephanie_1)：");
-        var readLine = Console.ReadLine();
-        Console.WriteLine("输入的博客地址:" + readLine + "@");
-        if (!readLine.StartsWith("https://blog.csdn.net/") && readLine != "")
-        {
-            Console.WriteLine("输入的站点非CSDN博客地址！请重启程序重新输入！");
-            Console.ReadKey();
-            return;
-        }
+        var readLine = "";
+        //暂时屏蔽参数接收
+        //readLine = Console.ReadLine();
+        //Console.WriteLine("输入的博客地址:" + readLine + "@");
+        //if (!readLine.StartsWith("https://blog.csdn.net/") && readLine != "")
+        //{
+        //    Console.WriteLine("输入的站点非CSDN博客地址！请重启程序重新输入！");
+        //    Console.ReadKey();
+        //    return;
+        //}
         if (readLine != "")
         {
             BLOG_URL = readLine;
@@ -63,14 +66,39 @@ public class Program
         }
     }
 
+
+
+
     private static void UpdateGetData()
     {
         Console.WriteLine("开始请求我的数据");
         WebClient MyWebClient = new WebClient();
         MyWebClient.Credentials = CredentialCache.DefaultCredentials;//获取或设置用于向Internet资源的请求进行身份验证的网络凭据
         Byte[] pageData = MyWebClient.DownloadData(BLOG_URL);
+         
+        //gzip
+        string pageHtml = "";
+        byte[] cbytes = pageData;
+        pageHtml = HttpGetUrl.HttpGet(BLOG_URL, "");
 
-        string pageHtml = Encoding.UTF8.GetString(pageData);  //如果获取网站页面采用的是GB2312，则使用这句
+        //2019-12-22 燕茹添加引入测试数据，测试读取博客网页正文内容，由于现在pageHtml怀疑被加密了，正文没能解析出来
+        //Console.WriteLine("请输入博客正文内容:");
+        //String readInfo = Console.ReadLine();
+        //Console.WriteLine("读取到的内容="+readInfo);
+        string accountFileKey = userNameKey + "的";
+        String pathRoot = Environment.CurrentDirectory;
+
+
+
+        ////////
+        //yanruTODO读取正文 由于解码过程中发现了问题，解码完的东西始终感觉像是加密的！
+        Console.WriteLine("请先将博客最新正文粘贴到'博客正文.txt'，粘贴完键入回车！");
+        string valueContentPath = pathRoot + @"\博客正文.txt";
+        pageHtml = File.ReadAllText(valueContentPath, Encoding.UTF8);
+        ////////
+     
+
+
         String finalContent = "";
         List<KeyValueInfo> keyList = new List<KeyValueInfo>();
          
@@ -220,25 +248,55 @@ public class Program
 
 
         string content = pageHtml;
-        string regexStr = "<dt>" + anyStr + "</dt>" + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>";
+        string regexStr = "";
+
+        //regexStr = "<dl class=\"text-center\" title=\""+anyStr+"\">" + anyStr
+        //    +"<dt>"+anyStr+"</dt>";//title=\"" + anyStr  + "\">"
+            //+
+        regexStr = "<dt>" + anyStr + "</dt>" + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>";
+
+
+        //regexStr = "访问";   // + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>"
         
         //step0:匹配格式：
         //<dt>评论</dt>
         //    <dd><span class="count">72</span></dd>
+         
         m = Regex.Match(content, regexStr, RegexOptions.Multiline);
-        Console.WriteLine("访问数评论数等的匹配的字符串=" + regexStr);
+        Console.WriteLine("访问数评论数等的匹配的字符串=" + regexStr+",count="+m.Length);
+        //Console.WriteLine("此时正文=\n" + content);
         while (m.Success)
         {
             var match = m;
             int tempIndex = 0;
-        //    Console.WriteLine("匹配到的=" + match.ToString());
+           // Console.WriteLine("匹配到的=" + match.ToString());
             string key = "";
             foreach(var item in m.Groups)
-            { 
+            {
                 if (tempIndex == 1)//中文关键字
+                {
                     key = item.ToString();
-                if (tempIndex == 3 && key!="")
-                    keyList.Add(new KeyValueInfo(key,item.ToString()));
+                }
+                if (tempIndex == 3 && key != "")
+                {
+                    //yanruTODO 重新解读数据，为了避免闭合标签出现14万+这样的非真实数据
+                    var tempStr = item.ToString(); //原先的逻辑
+                    if (key == "访问")
+                    {
+                        key = "访问(完整次数)";
+                        tempStr = content.Substring(0, m.Index);
+                        var titleKey = "title=";
+                        tempStr = tempStr.Substring(tempStr.LastIndexOf(titleKey) + titleKey.Length);
+                        tempStr = tempStr.Substring(tempStr.IndexOf("\"") + 1);
+                        tempStr = tempStr.Substring(0, tempStr.LastIndexOf("\""));
+                    }
+
+
+                    Console.WriteLine("tempIndex=" + tempIndex + ",key=" + key
+                        + ",是访问么?" + (key == "访问")
+                        + ",匹配到的=" + item.ToString() + ", tempStr=" + tempStr);
+                    keyList.Add(new KeyValueInfo(key, tempStr));
+                }
                 tempIndex++;
             }            
             m = m.NextMatch();
@@ -273,8 +331,6 @@ public class Program
         
         //保存解析后的值
         finalContent += "\n";
-        string accountFileKey = userNameKey +"的";
-        String pathRoot = Environment.CurrentDirectory;
         string valuePath = pathRoot + @"\" + accountFileKey + "统计关键字的值.txt";
         string keyPath = pathRoot + @"\" + accountFileKey + "统计关键字.txt";
         var oldLines = new string[1];
@@ -314,7 +370,7 @@ public class Program
                             var newValue = newValueList[tempIndex];
                             if (oldValue != newValue && tempIndex > 0)//忽略0的
                             {
-                             //   Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + ",值不同?" + (oldValue != newValue) + "@");
+                                //Console.WriteLine("新的值=" + oldValue + ",newValue=" + newValue + ",值不同?" + (oldValue != newValue) + "@");
                                 allValueSame = false;
                                 break;
                             }
@@ -339,24 +395,5 @@ public class Program
         } 
     }
 
-    //public static  string GetConfigValue(string appKey)
-    //{
-    //    XmlDocument xDoc = new XmlDocument();
-    //    try
-    //    {
-    //        xDoc.Load(System.Windows.Forms.Application.ExecutablePath + ".config");
-    //        XmlNode xNode;
-    //        XmlElement xElem;
-    //        xNode = xDoc.SelectSingleNode("//appSettings");
-    //        xElem = (XmlElement)xNode.SelectSingleNode("//add[@key='" + appKey + "']");
-    //        if (xElem != null)
-    //            return xElem.GetAttribute("value");
-    //        else
-    //            return "";
-    //    }
-    //    catch (Exception)
-    //    {
-    //        return "";
-    //    }
-    //}
+   
 }
