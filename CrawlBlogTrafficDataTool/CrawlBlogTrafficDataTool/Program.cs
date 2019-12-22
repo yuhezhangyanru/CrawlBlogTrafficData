@@ -226,7 +226,7 @@ public class Program
         //<dt>评论</dt>
         //    <dd><span class="count">72</span></dd>
         m = Regex.Match(content, regexStr, RegexOptions.Multiline);
-        Console.WriteLine("匹配的字符串="+regexStr);
+        Console.WriteLine("访问数评论数等的匹配的字符串=" + regexStr);
         while (m.Success)
         {
             var match = m;
