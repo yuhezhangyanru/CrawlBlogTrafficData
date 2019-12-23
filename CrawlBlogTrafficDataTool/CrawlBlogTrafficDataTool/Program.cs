@@ -90,11 +90,11 @@ public class Program
 
 
 
-        ////////
+        //////// 2019-12-23 当我换用了VS2017，就没有乱码的问题了！！
         //yanruTODO读取正文 由于解码过程中发现了问题，解码完的东西始终感觉像是加密的！
-        Console.WriteLine("请先将博客最新正文粘贴到'博客正文.txt'，粘贴完键入回车！");
-        string valueContentPath = pathRoot + @"\博客正文.txt";
-        pageHtml = File.ReadAllText(valueContentPath, Encoding.UTF8);
+        //Console.WriteLine("请先将博客最新正文粘贴到'博客正文.txt'，粘贴完键入回车！");
+        //string valueContentPath = pathRoot + @"\博客正文.txt";
+        //pageHtml = File.ReadAllText(valueContentPath, Encoding.UTF8);
         ////////
      
 
