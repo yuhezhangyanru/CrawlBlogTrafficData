@@ -250,57 +250,34 @@ public class Program
         string content = pageHtml;
         string regexStr = "";
 
-        //regexStr = "<dl class=\"text-center\" title=\""+anyStr+"\">" + anyStr
-        //    +"<dt>"+anyStr+"</dt>";//title=\"" + anyStr  + "\">"
-            //+
+        //匹配总访问次数等格式
         regexStr = "<dt>" + anyStr + "</dt>" + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>";
+
+        //匹配总排名等格式
+       //var  regexStrRank = "<dt>" + anyStr + "</dt>" + "([\\s\\S]*?)<dd>"+anyStr+ "<a class=\"grade - box - rankA\" href=\"https://blog.csdn.net/rank/writing_rank_total\" target=\"_blank\">" + anyStr + "</a></dd>";
+       // Match mRank = Regex.Match(content, regexStrRank, RegexOptions.Multiline);
+
+        //< dl title = "30680" >
+        //     < dt > 总排名:</ dt >
+        //        < dd >
+        //            < a class="grade-box-rankA" href="https://blog.csdn.net/rank/writing_rank_total" target="_blank">
+        //            3万+                </a>
+        //    </dd>
+        //</dl>
 
 
         //regexStr = "访问";   // + "([\\s\\S]*?)<dd><span class=" + sign + "count" + sign + ">" + anyStr + "</span></dd>"
-        
+
         //step0:匹配格式：
         //<dt>评论</dt>
         //    <dd><span class="count">72</span></dd>
-         
+
         m = Regex.Match(content, regexStr, RegexOptions.Multiline);
         Console.WriteLine("访问数评论数等的匹配的字符串=" + regexStr+",count="+m.Length);
-        //Console.WriteLine("此时正文=\n" + content);
-        while (m.Success)
-        {
-            var match = m;
-            int tempIndex = 0;
-           // Console.WriteLine("匹配到的=" + match.ToString());
-            string key = "";
-            foreach(var item in m.Groups)
-            {
-                if (tempIndex == 1)//中文关键字
-                {
-                    key = item.ToString();
-                }
-                if (tempIndex == 3 && key != "")
-                {
-                    //yanruTODO 重新解读数据，为了避免闭合标签出现14万+这样的非真实数据
-                    var tempStr = item.ToString(); //原先的逻辑
-                    if (key == "访问")
-                    {
-                        key = "访问(完整次数)";
-                        tempStr = content.Substring(0, m.Index);
-                        var titleKey = "title=";
-                        tempStr = tempStr.Substring(tempStr.LastIndexOf(titleKey) + titleKey.Length);
-                        tempStr = tempStr.Substring(tempStr.IndexOf("\"") + 1);
-                        tempStr = tempStr.Substring(0, tempStr.LastIndexOf("\""));
-                    }
+        initMatchResult(content, keyList, m);
+        ////2019-12-23加入合并处理总排名等信息
+        //initMatchResult(content, keyList, mRank);
 
-
-                    Console.WriteLine("tempIndex=" + tempIndex + ",key=" + key
-                        + ",是访问么?" + (key == "访问")
-                        + ",匹配到的=" + item.ToString() + ", tempStr=" + tempStr);
-                    keyList.Add(new KeyValueInfo(key, tempStr));
-                }
-                tempIndex++;
-            }            
-            m = m.NextMatch();
-        }
         List<string> tempStrList = new List<string>();
         for (int tempIndex = 0; tempIndex < keyList.Count; tempIndex++)
         {
@@ -393,6 +370,46 @@ public class Program
         {
             sw.Write(keyContent); 
         } 
+    }
+
+    private static void initMatchResult(String content, List<KeyValueInfo> keyList, Match m)
+    {
+        while (m.Success)
+        {
+            var match = m;
+            int tempIndex = 0;
+            string key = "";
+            foreach (var item in m.Groups)
+            {
+                if (tempIndex == 1)//中文关键字
+                {
+                    key = item.ToString();
+                }
+                if (tempIndex == 3 && key != "")
+                {
+                    //yanruTODO 重新解读数据，为了避免闭合标签出现14万+这样的非真实数据
+                    var tempStr = item.ToString(); //原先的逻辑
+
+                    if (key == "访问" || key == "总排名:" || key== "周排名:" || key== "积分:" || key == "等级:")
+                    {
+                        key += "(完整次数)";
+                        tempStr = content.Substring(0, m.Index);
+                        var titleKey = "title=";
+                        tempStr = tempStr.Substring(tempStr.LastIndexOf(titleKey) + titleKey.Length);
+                        tempStr = tempStr.Substring(tempStr.IndexOf("\"") + 1);
+                        tempStr = tempStr.Substring(0, tempStr.LastIndexOf("\""));
+                    }
+
+
+                    Console.WriteLine("tempIndex=" + tempIndex + ",key=" + key
+                        + ",是访问么?" + (key == "访问")
+                        + ",匹配到的=" + item.ToString() + ", tempStr=" + tempStr);
+                    keyList.Add(new KeyValueInfo(key, tempStr));
+                }
+                tempIndex++;
+            }
+            m = m.NextMatch();
+        }
     }
 
    
